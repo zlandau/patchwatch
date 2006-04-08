@@ -28,8 +28,8 @@ module PatchWatch::Models
         end
     end
     class Comment < Base; belongs_to :patch; belongs_to :author end
-    class State < Base; end
-    class Admin < Base; end
+    class State < Base; validates_uniqueness_of :name end
+    class Admin < Base; validates_uniqueness_of :username end
     class Branch < Base; has_and_belongs_to_many :patches end
 end
 
@@ -321,14 +321,19 @@ def PatchWatch.create
     end
 end
 
-if __FILE__ == $0
-    require 'mongrel/camping'
-
+def PatchWatch.connect
     PatchWatch::Models::Base.establish_connection :adapter => 'sqlite3', :database => 'patchwatch.db'
     PatchWatch::Models::Base.logger = Logger.new('patchwatch.log')
     PatchWatch::Models::Base.threaded_connections = false
     PatchWatch.create
+end
+
+if $0 == __FILE__
+    require 'mongrel/camping'
+
+    PatchWatch.connect
 
     server = Mongrel::Camping::start("0.0.0.0", 3301, "/patchwatch", PatchWatch)
+    puts "Server running on localhost:3301"
     server.run.join
 end
