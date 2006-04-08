@@ -1,0 +1,74 @@
+body {
+}
+
+a:visited { color: #000000; }
+
+table {
+	border-collapse: collapse;
+}
+
+table.patchlist {
+	border: thin solid black;
+}
+
+table.patchlist tr td {
+	padding: 2px 6px 2px 6px;
+	margin: 0px;
+}
+
+table.patchmeta tr th, table.patchmeta tr td {
+	text-align: left;
+	padding: 3px 10px 3px 10px;
+}
+
+tr.odd {
+	background: #ffffff;
+}
+
+tr.even {
+	background: #eeeeee;
+}
+
+.colactive {
+	color: red;
+}
+a.colinactive {
+	color: black;
+	text-decoration: none;
+}
+a.colinactive:hover {
+	color: red;
+}
+
+#footer {
+	padding: 1em;
+	font-size: small;
+	text-align: center;
+	color: #cccccc;
+}
+
+#footer a {
+        color: #cccccc;
+}
+
+.comment .meta {
+	background: #eeeeee;
+}
+
+.patch .content {
+	border: thin solid gray;
+	padding: 1em;
+}
+
+.quote {
+	color: #007f00;
+}
+
+.auth {
+	font-size: small;
+    color: #FFFFFF;
+}
+
+.search {
+	float: right;
+}
