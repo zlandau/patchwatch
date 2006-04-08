@@ -21,7 +21,7 @@ module PatchWatch::Models
     class Patch < Base
         belongs_to :author
         belongs_to :state
-        has_many :comments
+        has_many :comments, :order => 'date ASC'
         has_and_belongs_to_many :branches
         validates_uniqueness_of :msgid
     end
@@ -104,7 +104,9 @@ module PatchWatch::Controllers
     class Index < R '/'
         def get
             @search_term = input.q
-            @patches = Patch.find :all, :conditions => ['name LIKE ?', "%#{input.q}%" || "%"]
+            @patches = Patch.find :all,
+                                  :conditions => ['name LIKE ?', "%#{input.q}%" || "%"],
+                                  :order => 'date DESC'
             render :index
         end
     end
