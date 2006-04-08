@@ -86,18 +86,9 @@ PatchWatch::Models.schema do
 
     execute "INSERT INTO patchwatch_states (name) VALUES ('New')"
     execute "INSERT INTO patchwatch_states (name) VALUES ('Pending Review')"
-    execute "INSERT INTO patchwatch_authors (email, name) VALUES ('kapheine@divineinvasion.net', 'Zachary P. Landau')"
-    execute "INSERT INTO patchwatch_authors (email) VALUES ('bob@hope.com')"
-    execute "INSERT INTO patchwatch_patches (name, filename, content, msgid, author_id, state_id) VALUES ('A patch', 'somepatch.dpatch', 'And this is the patch', 'msgid1234', 1, 1)"
-    execute "INSERT INTO patchwatch_comments (author_id, patch_id, content) VALUES (1, 1, 'Some comment')"
-    execute "INSERT INTO patchwatch_patches (name, filename, content, msgid, author_id, state_id) VALUES ('Another patch', 'another.dpatch', 'Some contents', 'msgid1235', 2, 2)"
-    execute "INSERT INTO patchwatch_comments (author_id, patch_id, content) VALUES (2, 2, 'Blah Blah')"
-    execute "INSERT INTO patchwatch_comments (author_id, patch_id, content) VALUES (1, 2, 'More crap')"
-    execute "INSERT INTO patchwatch_admins (username, password) VALUES ('kapheine', 'pw')"
     execute "INSERT INTO patchwatch_branches (name) VALUES ('stable')"
     execute "INSERT INTO patchwatch_branches (name) VALUES ('unstable')"
-    execute "INSERT INTO patchwatch_branches_patches (patch_id, branch_id) VALUES (1, 1)"
-    execute "INSERT INTO patchwatch_branches_patches (patch_id, branch_id) VALUES (1, 2)"
+    execute "INSERT INTO patchwatch_admins (username, password) VALUES ('kapheine', 'pw')"
 end
 
 module PatchWatch::Controllers
