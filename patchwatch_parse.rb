@@ -20,7 +20,7 @@ def clean_subject(txt, header)
 end
 
 def clean_body(txt, header)
-    txt.gsub(header, "")
+    RMail::Utils.quoted_printable_decode(txt.gsub(header, ""))
 end
 
 def is_patch?(part)
