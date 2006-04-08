@@ -16,7 +16,12 @@ module PatchWatch::Models
         @@schema
     end
 
-    class Patch < Base; belongs_to :author; belongs_to :state; has_many :comments end
+    class Patch < Base
+        belongs_to :author
+        belongs_to :state
+        has_many :comments
+        has_and_belongs_to_many :branches
+    end
     class Author < Base
         def display_name
             name || email
@@ -25,6 +30,7 @@ module PatchWatch::Models
     class Comment < Base; belongs_to :patch; belongs_to :author end
     class State < Base; end
     class Admin < Base; end
+    class Branch < Base; has_and_belongs_to_many :patches end
 end
 
 PatchWatch::Models.schema do
@@ -62,6 +68,16 @@ PatchWatch::Models.schema do
         t.column :password,   :string,  :limit => 255
         t.column :created_at, :timestamp
     end
+    create_table :patchwatch_branches, :force => true do |t|
+        t.column :id,         :integer, :null => false
+        t.column :name,       :string, :limit => 25
+        t.column :created_at, :timestamp
+    end
+    create_table :patchwatch_branches_patches, :force => true do |t|
+        t.column :patch_id,   :integer, :null => false
+        t.column :branch_id,  :integer, :null => false
+        t.column :created_at, :timestamp
+    end
 
     execute "INSERT INTO patchwatch_states (name) VALUES ('New')"
     execute "INSERT INTO patchwatch_states (name) VALUES ('Pending Review')"
@@ -73,6 +89,10 @@ PatchWatch::Models.schema do
     execute "INSERT INTO patchwatch_comments (author_id, patch_id, content) VALUES (2, 2, 'Blah Blah')"
     execute "INSERT INTO patchwatch_comments (author_id, patch_id, content) VALUES (1, 2, 'More crap')"
     execute "INSERT INTO patchwatch_admins (username, password) VALUES ('kapheine', 'pw')"
+    execute "INSERT INTO patchwatch_branches (name) VALUES ('stable')"
+    execute "INSERT INTO patchwatch_branches (name) VALUES ('unstable')"
+    execute "INSERT INTO patchwatch_branches_patches (patch_id, branch_id) VALUES (1, 1)"
+    execute "INSERT INTO patchwatch_branches_patches (patch_id, branch_id) VALUES (1, 2)"
 end
 
 module PatchWatch::Controllers
@@ -96,6 +116,11 @@ module PatchWatch::Controllers
             @patch = Patch.find patch_id
             @logged_in = !@state.admin_id.blank?
             @states = State.find :all
+            @branches = Branch.find :all
+            @has_branches = {}
+            @patch.branches do |b|
+                @has_branches[b.id] = true
+            end
             render :view
         end
     end
@@ -134,6 +159,12 @@ module PatchWatch::Controllers
     end
 
     class Edit
+        def post
+            @patch = Patch.find input.patch_id
+            puts "patch: #{@patch}"
+            p input
+            redirect View, @patch
+        end
     end
 end
 
@@ -209,6 +240,11 @@ module PatchWatch::Views
                                     tag! :option, s.name, :value => s.id, :selected =>nil 
                                 end
                             end
+                        end
+                    end }
+                    tr { th 'Branches' ; td do
+                        @branches.each do |b|
+                            input b.name, :type => 'checkbox', :name => "branch[#{b.id}]", :value => @has_branches[b.id]
                         end
                     end }
                 else
