@@ -6,6 +6,8 @@ require 'camping/session'
 
 Camping.goes :PatchWatch
 
+DATEFORMAT = "%Y-%m-%d %H:%M:%S"
+
 module PatchWatch
     include Camping::Session
 end
@@ -21,6 +23,7 @@ module PatchWatch::Models
         belongs_to :state
         has_many :comments
         has_and_belongs_to_many :branches
+        validates_uniqueness_of :msgid
     end
     class Author < Base
         def display_name
@@ -38,10 +41,11 @@ PatchWatch::Models.schema do
         t.column :id,         :integer, :null => false
         t.column :name,       :string,  :limit => 255
         t.column :filename,   :string,  :limit => 255
+        t.column :date,       :datetime
         t.column :content,    :text
         t.column :msgid,      :string,  :limit => 255
         t.column :author_id,  :integer, :null => false
-        t.column :state_id,   :integer, :null => false
+        t.column :state_id,   :integer, :default => 1
         t.column :created_at, :timestamp
     end
     create_table :patchwatch_authors, :force => true do |t|
@@ -54,6 +58,7 @@ PatchWatch::Models.schema do
         t.column :id,         :integer, :null => false
         t.column :author_id,  :integer, :null => false 
         t.column :patch_id,   :integer, :null => false
+        t.column :date,       :datetime
         t.column :content,    :text
         t.column :created_at, :timestamp
     end
@@ -172,12 +177,11 @@ module PatchWatch::Views
     def layout
         html do
             head do
-                title 'Darcs / Patches'
+                title 'Patches'
                 link :rel => 'stylesheet', :type => 'text/css',
                      :href => '/style.css', :media => 'screen'
             end
             body do
-                h1.header { a 'Darcs Patches', :href => R(Index) }
                 div.content do
                     self << yield
                 end
@@ -186,6 +190,8 @@ module PatchWatch::Views
     end
 
     def index
+        h1.header { a 'Patches', :href => R(Index) }
+
         _auth
         _search
 
@@ -206,7 +212,7 @@ module PatchWatch::Views
                 @patches.each do |patch|
                     tr :class => ((odd and "odd") or "even") do
                         td { a patch.name, :href => R(View, patch) }
-                        td(patch.created_at() || "N/A")
+                        td(patch.date() || "N/A")
                         td { a patch.author.display_name,
                              :href => "mailto:#{patch.author.email}" }
                         td patch.state.name
@@ -220,61 +226,17 @@ module PatchWatch::Views
     end
 
     def view
+        h1.header { a "Patch: #{@patch.name}", :href => R(Index) }
+
         _auth
-
-        form :action => R(Edit), :method => 'post' do
-            table.patchmeta do
-                author = @patch.author
-                tr { th 'Submitter' ; td { a author.display_name, :href => "mailto:#{author.email}" } }
-                tr { th 'Date'      ; td @patch.created_at }
-                tr { th 'Message ID'; td @patch.msgid }
-                tr { th 'Download'  ; td { a @patch.filename, :href => R(Download, @patch.id) } }
-                if @logged_in
-                    tr { th 'State' ; td do
-                        tag! :select, :id => 'state_id' do
-                            @states.each do |s|
-                                #tag! :option, s.name, :value => s.id, :selected => true
-                                if s.id == 1
-                                    tag! :option, s.name, :value => s.id
-                                else
-                                    tag! :option, s.name, :value => s.id, :selected =>nil 
-                                end
-                            end
-                        end
-                    end }
-                    tr { th 'Branches' ; td do
-                        @branches.each do |b|
-                            input b.name, :type => 'checkbox', :name => "branch[#{b.id}]", :value => @has_branches[b.id]
-                        end
-                    end }
-                else
-                    tr { th 'State'     ; td @patch.state.name }
-                end
-
-                input :type => 'hidden', :name => 'patch_id', :value => @patch.id
-            end
-            if @logged_in
-                input :type => 'submit', :value => 'Update'
-            end
-        end
+        _patch_header
 
         h2 'Comments'
-        @patch.comments.each do |c|
-            div.comment do
-                div.meta do
-                    p { a c.author.display_name, :href => "mailto:#{c.author.email}" }
-                    pd c.created_at
-                end
-                pre.content do
-                    p c.content
-                end
-            end
-        end
+        @comments = @patch.comments
+        _comments
 
         h2 'Patch'
-        div.patch do
-            pre.content { @patch.content }
-        end
+        _patch
     end
 
     def _auth
@@ -310,6 +272,68 @@ module PatchWatch::Views
                 input :name => 'q', :type => 'text', :value => @search_term
                 input :type => 'submit', :value => 'search'
             end
+        end
+    end
+
+    def _comments
+        @comments.each do |c|
+            div.comment do
+                div.meta do
+                    uri = "mailto:#{c.author.email}"
+                    capture {a c.author.display_name, :href => "mailto:#{c.author.email}"} +
+                        c.date.strftime(DATEFORMAT)
+                    #p do a c.author.display_name, :href => "mailto:#{c.author.email}"
+                    #    c.date
+                    #end
+                end
+                pre.content do
+                    p c.content
+                end
+            end
+        end
+    end
+
+    def _patch_header
+        form :action => R(Edit), :method => 'post' do
+            table.patchmeta do
+                author = @patch.author
+                tr { th 'Submitter' ; td { a author.display_name, :href => "mailto:#{author.email}" } }
+                tr { th 'Date'      ; td @patch.date }
+                tr { th 'Message ID'; td @patch.msgid }
+                tr { th 'Download'  ; td { a @patch.filename, :href => R(Download, @patch.id) } }
+                if @logged_in
+                    tr { th 'State' ; td do
+                        tag! :select, :id => 'state_id' do
+                            @states.each do |s|
+                                #tag! :option, s.name, :value => s.id, :selected => true
+                                if s.id == 1
+                                    tag! :option, s.name, :value => s.id
+                                else
+                                    tag! :option, s.name, :value => s.id, :selected =>nil 
+                                end
+                            end
+                        end
+                    end }
+                    tr { th 'Branches' ; td do
+                        @branches.each do |b|
+                            input b.name, :type => 'checkbox', :name => "branch[#{b.id}]", :value => @has_branches[b.id]
+                        end
+                    end }
+                else
+                    tr { th 'State'     ; td @patch.state.name }
+                end
+
+                input :type => 'hidden', :name => 'patch_id', :value => @patch.id
+            end
+            if @logged_in
+                input :type => 'submit', :value => 'Update'
+            end
+        end
+    end
+
+    def _patch
+        div.patch do
+            pre.content { @patch.content }
         end
     end
 end
