@@ -256,14 +256,16 @@ module PatchWatch::Views
             @state.error = nil
         end
 
+        h1 'Authentication Required'
         form :action => R(Login), :method => 'post' do
-            label 'Username:', :for => 'username'
-            input :name => 'username', :type => 'text'; br
-
-            label 'Password:', :for => 'password'
-            input :name => 'password', :type => 'text'; br
-
-            input :type => 'submit', :name => 'login', :value => 'Login'
+            table.login do
+                tr { td { label 'Username:', :for => 'username' }
+                     td { input :name => 'username', :type => 'text'; br } }
+                tr { td { label 'Password:', :for => 'password' }
+                     td { input :name => 'password', :type => 'text'; br } }
+                tr { td {}
+                     td { input :type => 'submit', :name => 'login', :value => 'Login' } }
+            end
         end
     end
 
@@ -296,7 +298,7 @@ module PatchWatch::Views
             table.patchmeta do
                 author = @patch.author
                 tr { th 'Submitter' ; td { a author.display_name, :href => "mailto:#{author.email}" } }
-                tr { th 'Date'      ; td @patch.date }
+                tr { th 'Date'      ; td @patch.date.strftime(DATEFORMAT) }
                 tr { th 'Message ID'; td @patch.msgid }
                 tr { th 'Download'  ; td { a @patch.filename, :href => R(Download, @patch.id) } }
                 if @logged_in
