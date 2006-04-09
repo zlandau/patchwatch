@@ -36,6 +36,11 @@ def parse_references(refs)
     refs.split("\n\t")
 end
 
+def parse_filename(contenttype)
+    ma = contenttype.match(/name="([^"]*)"/)
+    return ma ? ma[1] : "unamed"
+end
+
 def parse_message(message)
     patches = []
     comments = []
@@ -84,6 +89,7 @@ def parse_message(message)
 
             if is_patch?(part)
                 data.name = subject
+                data.filename = parse_filename(part.header["Content-Type"])
                 patches << data
             elsif is_comment?(part)
                 comments << data
@@ -106,11 +112,12 @@ def add_patch(patch)
 
         # If the patch exists, we silently ignore it
         if not PatchWatch::Models::Patch.find_by_msgid(patch.msgid)
-            PatchWatch::Models::Patch.create!(:name    => patch.name,
-                                              :date    => patch.date,
-                                              :content => patch.content,
-                                              :msgid   => patch.msgid,
-                                              :author  => author)
+            PatchWatch::Models::Patch.create!(:name     => patch.name,
+                                              :filename => patch.filename,
+                                              :date     => patch.date,
+                                              :content  => patch.content,
+                                              :msgid    => patch.msgid,
+                                              :author   => author)
         end
     end
 end

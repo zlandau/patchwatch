@@ -123,8 +123,8 @@ module PatchWatch::Controllers
         end
     end
 
-    class Download < R '/download/(\d+)'
-        def get patch_id
+    class Download < R '/download/(\d+)/(.*)'
+        def get(patch_id, name)
             @patch = Patch.find patch_id
             @headers["Content-Type"] = "text/x-patch"
             @body = @patch.content
@@ -300,7 +300,7 @@ module PatchWatch::Views
                 tr { th 'Submitter' ; td { a author.display_name, :href => "mailto:#{author.email}" } }
                 tr { th 'Date'      ; td @patch.date.strftime(DATEFORMAT) }
                 tr { th 'Message ID'; td @patch.msgid }
-                tr { th 'Download'  ; td { a @patch.filename, :href => R(Download, @patch.id) } }
+                tr { th 'Download'  ; td { a @patch.filename, :href => R(Download, @patch.id, @patch.filename) } }
                 if @logged_in
                     tr { th 'State' ; td do
                         tag! :select, :name => 'state_id' do
