@@ -228,9 +228,10 @@ module PatchWatch::Views
     end
 
     def view
-        h1.header { a "Patch: #{@patch.name}", :href => R(Index) }
+        h1.header { capture { a "Patches", :href => R(Index) } + " / #{@patch.name}" }
 
         _auth
+        br
         _patch_header
 
         h2 'Comments'
