@@ -38,7 +38,7 @@ end
 
 def parse_filename(contenttype)
     ma = contenttype.match(/name="([^"]*)"/)
-    return ma ? ma[1] : "unamed"
+    return ma ? ma[1] : "unnamed"
 end
 
 def parse_message(message)
