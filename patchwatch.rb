@@ -283,9 +283,6 @@ module PatchWatch::Views
                     uri = "mailto:#{c.author.email}"
                     capture {a c.author.display_name, :href => "mailto:#{c.author.email}"} +
                         c.date.strftime(DATEFORMAT)
-                    #p do a c.author.display_name, :href => "mailto:#{c.author.email}"
-                    #    c.date
-                    #end
                 end
                 pre.content do
                     p c.content

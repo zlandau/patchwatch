@@ -40,8 +40,6 @@ def parse_message(message)
     patches = []
     comments = []
 
-    #chunks = message.multipart? ? message : RMail::Parser.read(message)
-    
     msg_header = message.header
 
     parts = []
@@ -76,11 +74,7 @@ def parse_message(message)
     all_parts.concat more
     
     all_parts.each do |part|
-        p part.multipart?
-
         if is_comment?(part) or is_patch?(part)
-            puts "#{part.body[0..80]}"
-
             data = OpenStruct.new
             data.date = date
             data.content = clean_body(part.body, IGNORE_BLOCK)
