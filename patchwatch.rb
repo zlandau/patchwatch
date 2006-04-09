@@ -85,10 +85,15 @@ PatchWatch::Models.schema do
     end
 
     execute "INSERT INTO patchwatch_states (name) VALUES ('New')"
-    execute "INSERT INTO patchwatch_states (name) VALUES ('Pending Review')"
+    execute "INSERT INTO patchwatch_states (name) VALUES ('Under Review')"
+    execute "INSERT INTO patchwatch_states (name) VALUES ('Changes Requested')"
+    execute "INSERT INTO patchwatch_states (name) VALUES ('Superseded')"
+    execute "INSERT INTO patchwatch_states (name) VALUES ('Accepted')"
+    execute "INSERT INTO patchwatch_states (name) VALUES ('Rejected')"
     execute "INSERT INTO patchwatch_branches (name) VALUES ('stable')"
     execute "INSERT INTO patchwatch_branches (name) VALUES ('unstable')"
     execute "INSERT INTO patchwatch_admins (username, password) VALUES ('kapheine', 'pw')"
+    execute "INSERT INTO patchwatch_admins (username, password) VALUES ('test', 'test')"
 end
 
 module PatchWatch::Controllers
@@ -186,6 +191,27 @@ module PatchWatch::Controllers
 
             @patch.save
             redirect View, @patch
+        end
+    end
+
+    class Remote
+        def post
+            admin = Admin.find_by_username_and_password(input.username, input.password)
+            patch = Patch.find_by_msgid(input.msgid)
+
+            if input.state
+                state = State.find_by_name(input.state)
+                if state
+                    patch.state = State.find_by_name(input.state)
+                    patch.save
+                end
+            end
+            if input.branches
+                branches = input.branches.split(',')
+                patch.branches.clear
+                patch.branches = Branch.find_all_by_name branches
+                patch.save
+            end
         end
     end
 end
