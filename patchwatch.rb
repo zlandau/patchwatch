@@ -92,12 +92,28 @@ PatchWatch::Models.schema do
 end
 
 module PatchWatch::Controllers
-    class Index < R '/'
-        def get
-            @search_term = input.q
-            @patches = Patch.find :all,
-                                  :conditions => ['name LIKE ?', "%#{input.q}%" || "%"],
-                                  :order => 'date DESC'
+    class Index < R '/', '/sort/([\w.]*)'
+        def get order=nil
+            @order_term = order
+            @order = order ? order : 'date DESC'
+            # Date, unlike the other orderings, should be descending
+            if @order == "date" then @order += " DESC" end
+
+            like = "%#{input.q}%" || "%"
+            if input.q && !input.q.empty?
+                @search_term = input.q
+            else
+                @search_term = nil
+            end
+
+            # I've had prouder moments...
+            @patches = Patch.find_by_sql("select patch.*,author.name as author, " +
+              " state.name as state,patch.date as date from patchwatch_patches  " +
+              " as patch inner join patchwatch_authors as author on author.id = " +
+              " patch.author_id inner join patchwatch_states as state on state.id " +
+              " = patch.state_id" +
+                                         " where patch.name LIKE #{Patch.quote(like)} " +
+                                         " order by #{@order}")
             render :index
         end
     end
@@ -204,12 +220,23 @@ module PatchWatch::Views
         end
 
         unless @patches.empty?
-            columns = %w{Patch Date Author State}
-
             odd = false
 
+            headers = [ ["Patch", "patch.name"], ["Date", "date"], ["Author", "author"],
+                        ["State", "state"] ]
+
             table.patchlist do
-                tr { columns.each { |c| th c } }
+                tr do
+                    headers.each do |h|
+                        txt, link = h[0], h[1]
+                        th { if @order == link
+                               span txt, :class => 'colactive'
+                             else
+                               a txt, :href => R(Index, link), :class => 'colinactive'
+                             end
+                        }
+                    end
+                end
                 @patches.each do |patch|
                     tr :class => ((odd and "odd") or "even") do
                         td { a patch.name, :href => R(View, patch) }
@@ -272,8 +299,14 @@ module PatchWatch::Views
     end
 
     def _search
+        if @order_term
+            redir = R(Index, @order_term)
+        else
+            redir = R(Index)
+        end
+
         div.search do
-            form :action => R(Index), :method => 'get' do
+            form :action => redir, :method => 'get' do
                 input :name => 'q', :type => 'text', :value => @search_term
                 input :type => 'submit', :value => 'search'
             end
