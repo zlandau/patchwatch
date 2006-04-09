@@ -217,6 +217,7 @@ module PatchWatch::Views
                         td { a patch.author.display_name,
                              :href => "mailto:#{patch.author.email}" }
                         td patch.state.name
+                        td { small { a "download", :href => R(Download, patch.id, patch.filename) } }
                     end
                     odd = !odd
                 end
