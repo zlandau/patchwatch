@@ -159,8 +159,16 @@ module PatchWatch::Controllers
     class Edit
         def post
             @patch = Patch.find input.patch_id
-            puts "patch: #{@patch}"
-            p input
+
+            @patch.branches.clear
+            if input.branch
+                @patch.branches = Branch.find_all_by_id input.branch.keys
+            end
+            if input.state_id
+                @patch.update_attributes :state_id => input.state_id
+            end
+
+            @patch.save
             redirect View, @patch
         end
     end
@@ -296,24 +304,29 @@ module PatchWatch::Views
                 tr { th 'Download'  ; td { a @patch.filename, :href => R(Download, @patch.id) } }
                 if @logged_in
                     tr { th 'State' ; td do
-                        tag! :select, :id => 'state_id' do
+                        tag! :select, :name => 'state_id' do
                             @states.each do |s|
                                 #tag! :option, s.name, :value => s.id, :selected => true
-                                if s.id == 1
-                                    tag! :option, s.name, :value => s.id
-                                else
+                                if s.id == @patch.state_id
                                     tag! :option, s.name, :value => s.id, :selected =>nil 
+                                else
+                                    tag! :option, s.name, :value => s.id
                                 end
                             end
                         end
                     end }
                     tr { th 'Branches' ; td do
                         @branches.each do |b|
-                            input b.name, :type => 'checkbox', :name => "branch[#{b.id}]", :value => @has_branches[b.id]
+                            if @patch.branches.find_by_id b.id
+                                input b.name, :type => 'checkbox', :name => "branch[#{b.id}]", :value => @has_branches[b.id], :checked => true
+                            else
+                                input b.name, :type => 'checkbox', :name => "branch[#{b.id}]", :value => @has_branches[b.id]
+                            end
                         end
                     end }
                 else
                     tr { th 'State'     ; td @patch.state.name }
+                    tr { th 'Branches'  ; td { @patch.branches.map { |b| capture { b.name }}.join(" ")} }
                 end
 
                 input :type => 'hidden', :name => 'patch_id', :value => @patch.id
