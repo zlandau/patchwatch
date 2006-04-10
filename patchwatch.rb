@@ -199,18 +199,22 @@ module PatchWatch::Controllers
             admin = Admin.find_by_username_and_password(input.username, input.password)
             patch = Patch.find_by_msgid(input.msgid)
 
-            if input.state
-                state = State.find_by_name(input.state)
-                if state
-                    patch.state = State.find_by_name(input.state)
+            if admin then
+                if input.state
+                    state = State.find_by_name(input.state)
+                    if state
+                        patch.state = State.find_by_name(input.state)
+                        patch.save
+                    end
+                end
+                if input.branches
+                    branches = input.branches.split(',')
+                    patch.branches.clear
+                    patch.branches = Branch.find_all_by_name branches
                     patch.save
                 end
-            end
-            if input.branches
-                branches = input.branches.split(',')
-                patch.branches.clear
-                patch.branches = Branch.find_all_by_name branches
-                patch.save
+            else
+                fail "Incorrect username or password"
             end
         end
     end
