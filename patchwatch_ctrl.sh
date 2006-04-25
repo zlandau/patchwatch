@@ -4,9 +4,9 @@ USERNAME=test
 PASSWORD=test
 HOST="http://localhost:3301/patchwatch/remote"
 
-MSGID=`egrep '^Message-Id: (<[^>]*>)' | cut -f2 -d' '`
-
-QUERY="username=$USERNAME;password=$PASSWORD;msgid=$MSGID"
+ALTID=$1
+shift
+QUERY="username=$USERNAME;password=$PASSWORD;altid=$ALTID"
 
 while [ $1 ]; do
     case "$1" in
@@ -26,4 +26,5 @@ while [ $1 ]; do
     shift
 done
 
+echo curl $HOST -d "$QUERY"
 curl $HOST -d "$QUERY"

@@ -221,14 +221,21 @@ module PatchWatch::Controllers
     class Remote
         def post
             admin = Admin.find_by_username_and_password(input.username, input.password)
-            patch = Patch.find_by_msgid(input.msgid)
 
             if admin then
+                patch = Patch.find_by_altid(input.altid)
+
+                if not patch
+                    fail "Invalid patch id: #{input.altid}"
+                end
+
                 if input.state
                     state = State.find_by_name(input.state)
                     if state
                         patch.state = State.find_by_name(input.state)
                         patch.save
+                    else
+                        fail "Invalid state #{input.state}"
                     end
                 end
                 if input.branches
