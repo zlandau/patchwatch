@@ -23,7 +23,11 @@ module PatchWatch::Models
         belongs_to :state
         has_many :comments, :order => 'date ASC'
         has_and_belongs_to_many :branches
-        validates_uniqueness_of :msgid
+
+        def self.exist? patch
+            (find :all, :conditions => ['altid = ? AND msgid = ? AND name = ?',
+                                         patch.altid, patch.msgid, patch.name]).length > 0
+        end
     end
     class Author < Base
         def display_name
@@ -43,7 +47,9 @@ PatchWatch::Models.schema do
         t.column :filename,   :string,  :limit => 255
         t.column :date,       :datetime
         t.column :content,    :text
+        t.column :dlcontent,  :text
         t.column :msgid,      :string,  :limit => 255
+        t.column :altid,      :string,  :limit => 255
         t.column :author_id,  :integer, :null => false
         t.column :state_id,   :integer, :default => 1
         t.column :created_at, :timestamp
@@ -148,7 +154,7 @@ module PatchWatch::Controllers
         def get(patch_id, name)
             @patch = Patch.find patch_id
             @headers["Content-Type"] = "text/x-patch"
-            @body = @patch.content
+            @body = @patch.dlcontent || @patch.content
         end
     end
 
@@ -365,6 +371,7 @@ module PatchWatch::Views
                 tr { th 'Submitter' ; td { a author.display_name, :href => "mailto:#{author.email}" } }
                 tr { th 'Date'      ; td @patch.date.strftime(DATEFORMAT) }
                 tr { th 'Message ID'; td @patch.msgid }
+                tr { th 'Alternate ID'; td @patch.altid }
                 tr { th 'Download'  ; td { a @patch.filename, :href => R(Download, @patch.id, @patch.filename) } }
                 if @logged_in
                     tr { th 'State' ; td do

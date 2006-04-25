@@ -2,9 +2,11 @@ require 'patchwatch'
 require 'rmail'
 require 'ostruct'
 require 'date'
+require 'patchinfo'
 
 SUBJECT_PREFIX = "\[darcs-devel\] "
-MIME_PATCH = %w(text/x-patch text/x-darcs-patch)
+PLAIN_PATCH = %w(text/x-patch)
+DARCS_PATCH = %w(text/x-darcs-patch)
 MIME_COMMENTS = %w(text/plain)
 IGNORE_BLOCK =<<HERE
 _______________________________________________
@@ -23,12 +25,15 @@ def clean_body(txt, header)
     RMail::Utils.quoted_printable_decode(txt.gsub(header, ""))
 end
 
-def is_patch?(part)
-    MIME_PATCH.include? part.header.content_type
+def is_plain_patch?(part)
+    PLAIN_PATCH.include? part.header.content_type
+end
+
+def is_darcs_patch?(part)
+    DARCS_PATCH.include? part.header.content_type
 end
 
 def is_comment?(part)
-    #puts "BEGIN #{part.body.to_s} END"
     (MIME_COMMENTS.include? part.header.content_type) && (part.body.to_s != IGNORE_BLOCK)
 end
 
@@ -39,6 +44,46 @@ end
 def parse_filename(contenttype)
     ma = contenttype.match(/name="([^"]*)"/)
     return ma ? ma[1] : "unnamed"
+end
+
+def parse_darcs_patches(references, msgid, part)
+    patches = []
+
+    full_body = clean_body(part.body, IGNORE_BLOCK)
+
+    begin
+        fd = StringIO.new(full_body)
+        3.times { fd.readline }
+
+        loop do
+            patchinfo = Darcs::PatchInfo.read(fd)
+            body = ""
+            line = nil
+            body += line while !((line = fd.readline) =~ /^\}/)
+            patch = OpenStruct.new
+            patch.name = patchinfo.name
+            patch.date = patchinfo.timestamp
+            patch.msgid = msgid
+            patch.altid = patchinfo.filename[0..-4]
+            patch.dlcontent = full_body
+            patch.filename = parse_filename(part.header["Content-Type"])
+
+            ra = RMail::Address.parse(patchinfo.author)
+            author = OpenStruct.new
+            author.email = ra.first.address
+            author.name = ra.first.name
+
+            patch.author = author
+            patch.content = body
+            patches << patch
+        end
+    rescue => e
+        # XXX: This is a quick, hackish way to keep parsing patches until
+        # we reach the end (which will result in an error).  This definitely
+        # should be fixed.
+    end
+
+    patches
 end
 
 def parse_message(message)
@@ -53,7 +98,7 @@ def parse_message(message)
     else
         p = OpenStruct.new
         p.header = message.header
-        p.body = clean_body(message.body, IGNORE_BLOCK)
+        p.body = message.body
         parts << p
     end
 
@@ -79,21 +124,23 @@ def parse_message(message)
     all_parts.concat more
     
     all_parts.each do |part|
-        if is_comment?(part) or is_patch?(part)
+        if is_comment?(part) or is_plain_patch?(part)
             data = OpenStruct.new
             data.date = date
-            data.content = clean_body(part.body, IGNORE_BLOCK)
             data.references = references
-            data.author = author
             data.msgid = msgid
+            data.content = clean_body(part.body, IGNORE_BLOCK)
+            data.author = author
 
-            if is_patch?(part)
+            if is_plain_patch?(part)
                 data.name = subject
                 data.filename = parse_filename(part.header["Content-Type"])
                 patches << data
             elsif is_comment?(part)
                 comments << data
             end
+        elsif is_darcs_patch?(part)
+            patches.concat parse_darcs_patches(references, msgid, part)
         end
     end
 
@@ -108,15 +155,25 @@ end
 
 def add_patch(patch)
     PatchWatch::Models::Patch.transaction do
-        author = get_author(patch.author)
+        if not PatchWatch::Models::Patch.exist? patch then
+            author = get_author(patch.author)
 
-        # If the patch exists, we silently ignore it
-        if not PatchWatch::Models::Patch.find_by_msgid(patch.msgid)
+            superseded = PatchWatch::Models::Patch.find :all,
+                :conditions => ['name = ? AND author_id = ?',
+                    patch.name, author.id]
+            state = PatchWatch::Models::State.find_by_name("Superseded")
+            superseded.each do |s|
+                s.state = state
+                s.save
+            end
+
             PatchWatch::Models::Patch.create!(:name     => patch.name,
                                               :filename => patch.filename,
                                               :date     => patch.date,
                                               :content  => patch.content,
+                                              :dlcontent => patch.dlcontent,
                                               :msgid    => patch.msgid,
+                                              :altid    => patch.altid,
                                               :author   => author)
         end
     end
@@ -127,17 +184,13 @@ def add_comment(comment)
         patches = []
 
         # If the comment was part of the patch email..
-        p = PatchWatch::Models::Patch.find_by_msgid(comment.msgid)
-        if p then patches << p end
+        patches.concat PatchWatch::Models::Patch.find_all_by_msgid(comment.msgid)
 
         # If the comment was a reply to the patch email..
         comment.references.each do |ref|
-            p = PatchWatch::Models::Patch.find_by_msgid(ref)
-            if p then patches << p end
+            patches.concat PatchWatch::Models::Patch.find_all_by_msgid(ref)
         end
 
-        # XXX: If multiple references are found, we add a copy of the comment to each
-        # patch.  I'm not sure if this is what we want or not
         patches.each do |p|
             PatchWatch::Models::Comment.create!(:author_id => get_author(comment.author).id,
                                                 :patch_id  => p.id,

@@ -2,7 +2,7 @@
 
 USERNAME=test
 PASSWORD=test
-HOST="http://butter.homeunix.net:3301/patchwatch/remote"
+HOST="http://localhost:3301/patchwatch/remote"
 
 MSGID=`egrep '^Message-Id: (<[^>]*>)' | cut -f2 -d' '`
 
