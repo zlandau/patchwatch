@@ -78,9 +78,7 @@ def parse_darcs_patches(references, msgid, part)
             patches << patch
         end
     rescue => e
-        # XXX: This is a quick, hackish way to keep parsing patches until
-        # we reach the end (which will result in an error).  This definitely
-        # should be fixed.
+        puts e
     end
 
     patches
@@ -153,11 +151,21 @@ def get_author(author)
     return PatchWatch::Models::Author.create(:email => author.email, :name => author.name)
 end
 
+def get_msgid(name)
+    msgid = PatchWatch::Models::Msgid.find_by_name(name)
+    return msgid if msgid
+    return PatchWatch::Models::Msgid.create(:name => name)
+end
+
 def add_patch(patch)
     PatchWatch::Models::Patch.transaction do
-        if not PatchWatch::Models::Patch.exist? patch then
-            author = get_author(patch.author)
+        author = get_author(patch.author)
 
+        if not PatchWatch::Models::Patch.exist? patch
+            # Find any patches that are not a repost but have the same name and
+            # author.  We assume this means that a patch has been fixed up and
+            # re-posted.  Mark all the previous ones as superseded by the new
+            # one.
             superseded = PatchWatch::Models::Patch.find :all,
                 :conditions => ['name = ? AND author_id = ?',
                     patch.name, author.id]
@@ -167,35 +175,56 @@ def add_patch(patch)
                 s.save
             end
 
-            PatchWatch::Models::Patch.create!(:name     => patch.name,
-                                              :filename => patch.filename,
-                                              :date     => patch.date,
-                                              :content  => patch.content,
-                                              :dlcontent => patch.dlcontent,
-                                              :msgid    => patch.msgid,
-                                              :altid    => patch.altid,
-                                              :author   => author)
+            # Now create the patch
+            p = PatchWatch::Models::Patch.create!(:name     => patch.name,
+                                                  :filename => patch.filename,
+                                                  :date     => patch.date,
+                                                  :content  => patch.content,
+                                                  :dlcontent => patch.dlcontent,
+                                                  :altid    => patch.altid,
+                                                  :author   => author)
+
+        else
+            # Otherwise, grab the already-existing patch
+            p = PatchWatch::Models::Patch.find_by_altid(patch.altid)
+        end
+
+        msgid = get_msgid(patch.msgid)
+        found = p.msgids.find :first, :conditions => ["name = ?", patch.msgid]
+        if not found
+            # If there is not already a link between this msgid and this patch,
+            # add it
+            PatchWatch::Models::Patch.connection.execute("insert into patchwatch_msgids_patches (msgid_id, patch_id) VALUES (#{msgid.id}, #{p.id})")
         end
     end
 end
 
 def add_comment(comment)
     PatchWatch::Models::Comment.transaction do
-        patches = []
+        # Create the comment
+        c = PatchWatch::Models::Comment.create!(:author_id => get_author(comment.author).id,
+                                                :date      => comment.date,
+                                                :content   => comment.content)
 
         # If the comment was part of the patch email..
-        patches.concat PatchWatch::Models::Patch.find_all_by_msgid(comment.msgid)
+        msgid = nil
+        msgid = PatchWatch::Models::Msgid.find_by_name(comment.msgid)
+        if msgid
+            # TODO: Do this using Active Record
+            msgid.patches.each do |p|
+                PatchWatch::Models::Patch.connection.execute("insert into patchwatch_comments_patches (patch_id, comment_id) VALUES (#{p.id},#{c.id})")
+            end
+        end
 
         # If the comment was a reply to the patch email..
         comment.references.each do |ref|
-            patches.concat PatchWatch::Models::Patch.find_all_by_msgid(ref)
-        end
-
-        patches.each do |p|
-            PatchWatch::Models::Comment.create!(:author_id => get_author(comment.author).id,
-                                                :patch_id  => p.id,
-                                                :date      => comment.date,
-                                                :content   => comment.content)
+            msgid = PatchWatch::Models::Msgid.find_by_name(ref)
+            if msgid
+                # TODO: Again, use Active Record
+                msgid.patches.each do |p|
+                    PatchWatch::Models::Patch.connection.execute("insert into patchwatch_comments_patches (patch_id, comment_id) VALUES (#{p.id}, #{c.id})")
+                end
+            end
         end
     end
 end
